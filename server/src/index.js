@@ -35,11 +35,21 @@ const authLimitMessage = { error: "操作太频繁，请稍后再试" };
 const registerLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 5, standardHeaders: "draft-7", legacyHeaders: false, message: authLimitMessage });
 const loginLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: "draft-7", legacyHeaders: false, message: authLimitMessage });
 
+// Express 4 does not catch rejected promises from async handlers; forward them to the error handler
+// instead of letting an unhandled rejection crash the process.
+const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+app.param("id", (req, res, next, id) => {
+  if (!uuidPattern.test(id)) return res.status(404).json({ error: "资源不存在" });
+  next();
+});
+
 app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/auth/register", registerLimit, async (req, res) => {
+app.post("/auth/register", registerLimit, asyncRoute(async (req, res) => {
   const username = String(req.body.username || "").trim();
   const password = String(req.body.password || "");
 
@@ -65,9 +75,9 @@ app.post("/auth/register", registerLimit, async (req, res) => {
     if (err.code === "23505") return res.status(409).json({ error: "用户名已存在" });
     throw err;
   }
-});
+}));
 
-app.post("/auth/login", loginLimit, async (req, res) => {
+app.post("/auth/login", loginLimit, asyncRoute(async (req, res) => {
   const username = String(req.body.username || "").trim();
   const password = String(req.body.password || "");
   const result = await query(
@@ -82,13 +92,13 @@ app.post("/auth/login", loginLimit, async (req, res) => {
   }
 
   res.json({ user: publicUser(user), token: signUser(user) });
-});
+}));
 
 app.get("/me", requireUser, (req, res) => {
   res.json({ user: publicUser(req.user) });
 });
 
-app.get("/rooms", requireUser, async (req, res) => {
+app.get("/rooms", requireUser, asyncRoute(async (req, res) => {
   const result = await query(
     `select id, name, livekit_name as "livekitName", is_public as "isPublic",
             max_members as "maxMembers", created_by as "createdBy"
@@ -96,9 +106,9 @@ app.get("/rooms", requireUser, async (req, res) => {
      order by is_public desc, created_at asc`
   );
   res.json({ rooms: result.rows });
-});
+}));
 
-app.post("/rooms", requireUser, async (req, res) => {
+app.post("/rooms", requireUser, asyncRoute(async (req, res) => {
   if (req.user.role !== "owner" && !req.user.canCreateRoom) {
     return res.status(403).json({ error: "你还没有创建房间权限" });
   }
@@ -120,9 +130,9 @@ app.post("/rooms", requireUser, async (req, res) => {
   );
 
   res.json(result.rows[0]);
-});
+}));
 
-app.delete("/rooms/:id", requireUser, async (req, res) => {
+app.delete("/rooms/:id", requireUser, asyncRoute(async (req, res) => {
   const roomResult = await query(
     "select id, is_public, created_by from rooms where id=$1",
     [req.params.id]
@@ -137,9 +147,9 @@ app.delete("/rooms/:id", requireUser, async (req, res) => {
 
   await query("delete from rooms where id=$1", [req.params.id]);
   res.json({ ok: true });
-});
+}));
 
-app.post("/rooms/:id/voice-token", requireUser, async (req, res) => {
+app.post("/rooms/:id/voice-token", requireUser, asyncRoute(async (req, res) => {
   const result = await query(
     "select id, livekit_name as \"livekitName\" from rooms where id=$1",
     [req.params.id]
@@ -168,9 +178,9 @@ app.post("/rooms/:id/voice-token", requireUser, async (req, res) => {
     token: await token.toJwt(),
     livekitUrl: process.env.LIVEKIT_URL
   });
-});
+}));
 
-app.post("/admin/users/:id/create-room-permission", requireUser, async (req, res) => {
+app.post("/admin/users/:id/create-room-permission", requireUser, asyncRoute(async (req, res) => {
   if (req.user.role !== "owner") return res.status(403).json({ error: "只有 owner 可以授权" });
 
   const enabled = Boolean(req.body.enabled);
@@ -182,7 +192,7 @@ app.post("/admin/users/:id/create-room-permission", requireUser, async (req, res
 
   if (!result.rows[0]) return res.status(404).json({ error: "用户不存在" });
   res.json({ user: publicUser(result.rows[0]) });
-});
+}));
 
 app.use((err, req, res, next) => {
   console.error(err);
