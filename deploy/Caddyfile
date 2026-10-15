@@ -1,0 +1,21 @@
+{$APP_DOMAIN} {
+  root * /srv
+  encode zstd gzip
+
+  handle_path /api/* {
+    reverse_proxy api:4000
+  }
+
+  handle /source {
+    redir {$SOURCE_URL} 302
+  }
+
+  handle {
+    try_files {path} /index.html
+    file_server
+  }
+}
+
+{$LIVEKIT_DOMAIN} {
+  reverse_proxy livekit:7880
+}

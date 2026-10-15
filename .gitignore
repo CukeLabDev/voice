@@ -1,0 +1,8 @@
+node_modules
+dist
+.env
+deploy/.env
+server/data
+*.log
+koe.sql
+*.backup
