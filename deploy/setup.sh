@@ -39,6 +39,9 @@ cat > .env <<EOF
 APP_DOMAIN=$app_domain
 LIVEKIT_DOMAIN=$livekit_domain
 SOURCE_URL=https://github.com/CukeLabDev/voice
+AUTH_PROVIDERS=local
+MUTSAKI_CLIENT_ID=
+MUTSAKI_CLIENT_SECRET=
 POSTGRES_PASSWORD=$(openssl rand -hex 32)
 JWT_SECRET=$(openssl rand -hex 32)
 LIVEKIT_API_KEY=koe$(openssl rand -hex 12)

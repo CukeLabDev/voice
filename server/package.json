@@ -6,7 +6,10 @@
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "migrate": "node src/migrate.js",
-    "create-owner": "node src/createOwner.js"
+    "create-owner": "node src/createOwner.js",
+    "list-accounts": "node src/listAccounts.js",
+    "set-owner": "node src/setOwner.js",
+    "test": "node --test src/providers/providers.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

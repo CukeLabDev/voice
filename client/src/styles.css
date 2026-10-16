@@ -85,6 +85,24 @@ input {
   font-weight: 800;
 }
 
+.oauth-button {
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+}
+
+.local-auth {
+  display: grid;
+  gap: 16px;
+}
+
+.auth-divider {
+  margin: 0;
+  color: #52636b;
+  text-align: center;
+  font-size: 13px;
+}
+
 .link-button {
   color: #31594f;
   background: transparent;
@@ -138,7 +156,7 @@ input {
 
 .room-creator {
   display: grid;
-  grid-template-columns: 1fr 72px 38px;
+  grid-template-columns: 1fr 38px;
   gap: 8px;
 }
 

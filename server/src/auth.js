@@ -15,9 +15,14 @@ export async function requireUser(req, res, next) {
 
   try {
     const payload = jwt.verify(token, jwtSecret);
+    const enabledProviders = (process.env.AUTH_PROVIDERS || "local").split(",").map((id) => id.trim().toLowerCase());
     const result = await query(
-      "select id, username, role, can_create_room as \"canCreateRoom\" from users where id=$1",
-      [payload.id]
+      `select u.id, u.username, u.display_name as "displayName", u.role, i.provider,
+              u.can_create_room as "canCreateRoom"
+       from users u join auth_identities i on i.user_id=u.id
+       where u.id=$1 and i.provider=any($2::text[])
+       limit 1`,
+      [payload.id, enabledProviders]
     );
 
     if (!result.rows[0]) return res.status(401).json({ error: "账号不存在" });
@@ -33,6 +38,8 @@ export function publicUser(user) {
   return {
     id: user.id,
     username: user.username,
+    displayName: user.displayName ?? user.display_name ?? user.username,
+    provider: user.provider,
     role: user.role,
     canCreateRoom: user.canCreateRoom ?? user.can_create_room
   };

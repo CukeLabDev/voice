@@ -3,10 +3,10 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
 import { rateLimit } from "express-rate-limit";
-import bcrypt from "bcryptjs";
 import { AccessToken } from "livekit-server-sdk";
 import { query } from "./db.js";
-import { publicUser, requireUser, signUser } from "./auth.js";
+import { publicUser, requireUser } from "./auth.js";
+import { installProviders } from "./providers/index.js";
 
 dotenv.config({ path: fileURLToPath(new URL("../../.env", import.meta.url)) });
 
@@ -49,50 +49,7 @@ app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/auth/register", registerLimit, asyncRoute(async (req, res) => {
-  const username = String(req.body.username || "").trim();
-  const password = String(req.body.password || "");
-
-  if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
-    return res.status(400).json({ error: "用户名只能用 3-20 位英文、数字或下划线" });
-  }
-  if (password.length < 8) {
-    return res.status(400).json({ error: "密码至少 8 位" });
-  }
-
-  const passwordHash = await bcrypt.hash(password, 10);
-
-  try {
-    const result = await query(
-      `insert into users (username, password_hash)
-       values ($1, $2)
-       returning id, username, role, can_create_room as "canCreateRoom"`,
-      [username, passwordHash]
-    );
-    const user = result.rows[0];
-    res.json({ user: publicUser(user), token: signUser(user) });
-  } catch (err) {
-    if (err.code === "23505") return res.status(409).json({ error: "用户名已存在" });
-    throw err;
-  }
-}));
-
-app.post("/auth/login", loginLimit, asyncRoute(async (req, res) => {
-  const username = String(req.body.username || "").trim();
-  const password = String(req.body.password || "");
-  const result = await query(
-    `select id, username, password_hash, role, can_create_room as "canCreateRoom"
-     from users where username=$1`,
-    [username]
-  );
-
-  const user = result.rows[0];
-  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
-    return res.status(401).json({ error: "用户名或密码不正确" });
-  }
-
-  res.json({ user: publicUser(user), token: signUser(user) });
-}));
+installProviders(app, { asyncRoute, registerLimit, loginLimit });
 
 app.get("/me", requireUser, (req, res) => {
   res.json({ user: publicUser(req.user) });
@@ -162,7 +119,7 @@ app.post("/rooms/:id/voice-token", requireUser, asyncRoute(async (req, res) => {
     process.env.LIVEKIT_API_SECRET,
     {
       identity: req.user.id,
-      name: req.user.username
+      name: req.user.displayName || req.user.username
     }
   );
 

@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { query, pool } from "./db.js";
+import { pool } from "./db.js";
 
 const username = process.argv[2];
 let password = process.argv[3];
@@ -47,13 +47,28 @@ if (password.length < 8) {
 
 const passwordHash = await bcrypt.hash(password, 10);
 
-await query(
-  `insert into users (username, password_hash, role, can_create_room)
-   values ($1, $2, 'owner', true)
-   on conflict (username)
-   do update set password_hash=excluded.password_hash, role='owner', can_create_room=true`,
-  [username, passwordHash]
-);
+const client = await pool.connect();
+try {
+  await client.query("begin");
+  const result = await client.query(
+    `insert into users (username, display_name, password_hash, role, can_create_room)
+     values ($1, $1, $2, 'owner', true)
+     on conflict (username)
+     do update set password_hash=excluded.password_hash, role='owner', can_create_room=true
+     returning id`,
+    [username, passwordHash]
+  );
+  await client.query(
+    "insert into auth_identities (provider, subject, user_id) values ('local', $1, $2) on conflict do nothing",
+    [username, result.rows[0].id]
+  );
+  await client.query("commit");
+} catch (error) {
+  await client.query("rollback");
+  throw error;
+} finally {
+  client.release();
+}
 
 console.log(`Owner account ready: ${username}`);
 await pool.end();

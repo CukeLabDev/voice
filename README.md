@@ -1,6 +1,6 @@
 # Koe Voice
 
-一个可自行部署的网页语音大厅，适合 Minecraft 社区等小型社群。用户可注册账号、进入常驻公共房间；站长可以授权其他用户创建房间。前端使用 React，API 使用 Node.js + PostgreSQL，实时语音由 LiveKit 提供。
+一个可自行部署的网页语音大厅，适合 Minecraft 社区等小型社群。用户可进入常驻公共房间；站长可以授权其他用户创建房间。账号可使用本地密码、Mutsaki OAuth，或同时启用两种方式。前端使用 React，API 使用 Node.js + PostgreSQL，实时语音由 LiveKit 提供。
 
 本项目采用 [GNU AGPL-3.0](LICENSE) 许可证。部署修改版并通过网络向用户提供服务时，请提供该版本的对应源代码；页面上的“源代码”链接可通过 `SOURCE_URL` 设置。
 
@@ -20,6 +20,29 @@ docker compose exec api npm run create-owner --workspace server -- admin
 
 命令会提示输入 owner 密码，输入内容不会显示，也不会进入 shell 历史。访问 `https://你的网页域名`，用这个账号登录。之后用户可在网页自行注册。
 
+### 选择账号来源
+
+在根目录 `.env` 中设置 `AUTH_PROVIDERS`，可选 `local`、`mutsaki` 或 `local,mutsaki`；默认只启用本地账号。修改后运行 `docker compose up -d`。关闭某一种登录方式不会删除该方式已有的账号，但其现有语音平台令牌会失效；重新启用后可以再次登录。新的认证提供方可按 `server/src/providers/` 中的接口加入注册表。
+
+启用 Mutsaki 前，先到 [Mutsaki 开发者平台](https://mutsaki.com/development) 创建并获批 OAuth 应用。授权回调必须填写 `https://你的网页域名/api/auth/mutsaki/callback`（将域名换成 `APP_DOMAIN` 的实际值）。然后在 `.env` 中填写：
+
+```dotenv
+AUTH_PROVIDERS=local,mutsaki
+MUTSAKI_CLIENT_ID=获批的客户端ID
+MUTSAKI_CLIENT_SECRET=客户端密钥
+```
+
+客户端密钥只进入 API 容器，不能放到网页代码或 Git 仓库。Mutsaki 登录使用授权码与 S256 PKCE；语音平台用 Mutsaki 返回的稳定 `sub` 识别用户，昵称变化不会产生新账号。**本地账号与 Mutsaki 账号始终独立**，即使同名也不会自动合并。首次用 Mutsaki 登录的用户为普通成员。
+
+如果只启用 `mutsaki`，无需创建本地 owner。先用 Mutsaki 登录一次，再在服务器执行下面两条命令，找出该账号的 `sub` 并授予 owner。`list-accounts` 输出包含账号标识，请勿公开分享。
+
+```sh
+docker compose exec api npm run list-accounts --workspace server
+docker compose exec api npm run set-owner --workspace server -- mutsaki '上一步看到的sub'
+```
+
+本地 owner 也可通过 `set-owner --workspace server -- local 用户名` 指定。Mutsaki 授权令牌在读取资料后尝试撤销；语音平台会签发自己的登录令牌。退出语音平台不会退出 Mutsaki，反之亦然。
+
 ### 运行和维护
 
 ```sh
@@ -37,7 +60,7 @@ docker compose down
 
 ## 本地开发
 
-需要 Node.js 20+ 和 Docker。根目录的 `.env.example` 是本地开发模板，与生产的 `deploy/.env.example` 分开。PowerShell 使用 `Copy-Item .env.example .env`，bash 使用 `cp .env.example .env`。随后运行：
+需要 Node.js 20+ 和 Docker。根目录的 `.env.example` 是本地开发模板，与生产的 `deploy/.env.example` 分开；本地默认只启用 `local`，Mutsaki 正式 OAuth 应用要求获批的 HTTPS 回调。PowerShell 使用 `Copy-Item .env.example .env`，bash 使用 `cp .env.example .env`。随后运行：
 
 ```sh
 npm install
