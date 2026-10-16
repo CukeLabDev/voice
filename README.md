@@ -4,6 +4,14 @@
 
 本项目采用 [GNU AGPL-3.0](LICENSE) 许可证。部署修改版并通过网络向用户提供服务时，请提供该版本的对应源代码；页面上的“源代码”链接可通过 `SOURCE_URL` 设置。
 
+## 仅将前端部署到 Cloudflare Pages
+
+已有独立后端时，可以把网页部署到 Pages。仓库根目录是 Pages 项目的根目录；构建命令为 `npm run build:pages`，输出目录为 `client/dist`，Node.js 版本使用 22。`build:pages` 会复制 AGPL 许可证，并只让 `/api/*` 请求进入 Pages Function。`/source` 会跳转到本仓库；如果发布的是 fork，请把 `client/public/_redirects` 改为实际提供对应源码的地址。
+
+在 Pages 项目的 Production 环境设置 `API_ORIGIN` 为后端的 HTTPS 源站地址（例如 `https://api.example.com`，不能包含 `/api` 或末尾以外的路径）。Pages Function 会将同源的 `/api/*` 转发到该地址的同一路径；前端不需要设置 `VITE_API_BASE`。同源转发使 Mutsaki OAuth 回调 Cookie 可以留在网页域名下。后端须把 `CLIENT_ORIGIN` 设为网页的正式地址；启用 Mutsaki 时，回调应为 `https://网页域名/api/auth/mutsaki/callback`。LiveKit 地址仍由后端的房间令牌接口下发。
+
+绑定正式域名后，先检查 `https://网页域名/api/health`，再检查本地账号登录、Mutsaki 回调（若启用）和两台设备的双向语音。预览域名通常不在后端允许的来源中，不适合做登录验收。
+
 ## 用 Docker Compose 部署到服务器
 
 需要一台有公网 IPv4 的 Linux 服务器、Docker Engine + Compose 插件、OpenSSL，以及两个指向这台服务器的 DNS A 记录（例如 `voice.example.com` 和 `rtc.example.com`）。服务器的 80/443 TCP、7881 TCP 和 50000–50100 UDP 端口需要开放。HTTPS 证书由 Caddy 自动申请；浏览器麦克风需要 HTTPS。

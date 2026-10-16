@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace server\" \"npm run dev --workspace client\"",
     "install:all": "npm install",
+    "build:pages": "npm run build --workspace client && node scripts/prepare-pages.mjs",
     "start": "npm run start --workspace server"
   },
   "workspaces": [
